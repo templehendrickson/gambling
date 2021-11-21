@@ -279,8 +279,45 @@ def runSimulation(numSims,hand=[],flop=[],turn=[],river=[],numPlayers=6):
     res = np.array([playGame(hand,flop,turn,river,numPlayers) for i in range(0,numSims)])
     
     return res
+
+def percentileOfScore(score,arr):
+    res = (score-1) / (np.max(arr) - 1)
+    return res
+
+def computeProbability(hand,dealt):
+    # compute the distribution of possible scores excluding those in hand and dealt
+
+    deck = Deck()
+    deck.shuffle()
+
+    deck.reconcile(hand+dealt)
+
+    # player best score
+    playerCombos = combinations(hand+dealt,5)
+    bestScore = max([score_hand(c,scoreOnly=True) for c in playerCombos])
+
+    # compute all possible scores
+    allCombos = combinations(deck.deck+dealt,5)
+    scores = [score_hand(c,scoreOnly=True) for c in allCombos]
+
+    # find percentile of player score against all possible
+    playerPercentile = percentileOfScore(bestScore,np.array(scores))
+
+    # probability of someone having better hand
+    lossProb = (1-playerPercentile)
+
+    return playerPercentile,lossProb
+
+def percentFormat(a):
+    return round(a*100,4)
+
+# t1,t2 = computeProbability(['D13','H13'],['C13','H10','S10'])
+
+# print('percentile of hand in possible outcomes: {}%, percent chance of loss: {}%'.format(percentFormat(t1),percentFormat(t2)))
+
+
     
 
-sims = runSimulation(1000,hand=['D13','H13'],flop=['C13'])
+# sims = runSimulation(1000,hand=['D13','H13'],flop=['C13'])
 
-print('probability of winning hand (n=1,000) w pocket kings and 1 kind in the flop: {}%'.format(round(np.sum(sims)/len(sims)*100,4)))
+# print('probability of winning hand (n=1,000) w pocket kings and 1 kind in the flop: {}%'.format(round(np.sum(sims)/len(sims)*100,4)))
