@@ -1,5 +1,5 @@
-import numba
-from numba import jit
+# import numba
+# from numba import jit
 import itertools
 import copy
 import os
@@ -49,6 +49,18 @@ def combinations(arr, n):
     result = np.fromiter(itertools.combinations(arr, n), t)
     return result.view(arr.dtype).reshape(-1, n)
 
+def uniqueRandIntsNb(uBound,count):
+    res = []
+    for a in range(0,count):
+        i = np.random.randint(uBound)
+        if i not in res:
+            res.append(i)
+        else:
+            while i in res:
+                i = np.random.randint(uBound)
+            res.append(i)
+            
+    return res
 
 def findAllCombos(someCards):
     res = [[]]
@@ -253,7 +265,7 @@ def findBestHand(cards,payTable,n=1000):
 
     return bestHand,maxScore
 
-def playGame(payTable,bet=5):
+def playGame(payTable,bet=5,pickRandom=False):
 
     deck = Deck()
     deck.shuffle()
@@ -261,8 +273,17 @@ def playGame(payTable,bet=5):
     # 5 random cards
     dealt = deck.dealNumber(5)
 
-    # findbest ones to keep
-    bestHand,score = findBestHand(dealt,payTable)
+    if not pickRandom:
+
+        # findbest ones to keep
+        bestHand,score = findBestHand(dealt,payTable)
+
+    if pickRandom:
+
+        # determine rand number cards to keep
+        numCount = np.random.randint(0,5)
+        randPulls = uniqueRandIntsNb(5,numCount)
+        bestHand = [dealt[i] for i in randPulls]
 
     ## play and bet
     newCards = deck.dealNumber(5-len(bestHand))
@@ -275,9 +296,9 @@ def playGame(payTable,bet=5):
 
     return pnl
 
-def simulateNumberGames(numberSims,payTable,bet=5):
+def simulateNumberGames(numberSims,payTable,bet=5,pickRandom=False):
 
-    sims = np.array([playGame(payTable,bet) for n in tqdm(range(numberSims))])
+    sims = np.array([playGame(payTable,bet,pickRandom) for n in tqdm(range(numberSims))])
 
     return sims
 
@@ -298,6 +319,6 @@ payTable = {
 # t = findBestHand(['H10','H11','H12','H13','H13'],payTable)
 
 # print(t)
-t = playGame(payTable)
+# t = playGame(payTable,pickRandom=True)
 
 # print('complete')
