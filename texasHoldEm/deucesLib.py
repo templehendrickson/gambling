@@ -255,7 +255,7 @@ class Card (object):
     @staticmethod
     def printCards(someCards):
         cards = [Card.formatCard(cInt) for cInt in someCards]
-        print(cards)
+        return cards
 
 class Deck (object):
     """
@@ -284,6 +284,10 @@ class Deck (object):
 
     def __str__(self):
         return Card.print_pretty_cards(self.cards)
+
+    # this is to remove specific cards from the deck that have already been dealt
+    def reconcile(self,listCards):
+        self.cards = [a for a in self.cards if a not in listCards]
 
     @staticmethod
     def GetFullDeck():
@@ -746,3 +750,9 @@ class Evaluator(object):
                 else:
                     print( "Players %s tied for the win with a %s\n" % (winners, 
                         self.class_to_string(self.get_rank_class(self.evaluate(hands[winners[0]], board)))))
+
+    def descHand(self,score):
+        aClass = self.get_rank_class(score)
+        desc = self.class_to_string(aClass)
+
+        return desc

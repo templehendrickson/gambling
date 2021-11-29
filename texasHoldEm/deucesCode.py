@@ -5,6 +5,7 @@ def deucesFormatConvert(s):
     # H14 -> Ah
 
     convDict = {
+        '10':'T',
         '11':'J',
         '12':'Q',
         '13':'K',
@@ -19,7 +20,7 @@ def deucesFormatConvert(s):
 
     newS = val + suit.lower()
 
-    print(newS)
+    # print(newS)
 
     cardObj = Card.new(newS)
 
@@ -41,7 +42,7 @@ def deucesFormatConvert(s):
 #     t = evaluator.class_to_string(evaluator.get_rank_class(score))
 #     print(t)
 
-## testing evaluator
+# ## testing evaluator
 # deck = Deck()
 # board = deck.draw(5)
 # hand1 = deck.draw(2)
@@ -83,4 +84,85 @@ def deucesFormatConvert(s):
 # printEvalWrapper(eval,hand2_score)
 
 # print('complete')
+
+def playGameDeuces(evalObj,hole,flop=[],turn=[],river=[],numPlayers=6,binaries=False):
+
+    # create deck and eval
+    deck = Deck()
+    # eval = Evaluator()
+
+    # deal all cards
+    playerHand = hole
+    board = flop + turn + river
+    # board = [deucesFormatConvert(a) for a in board]
+    # remove those that were already dealt when deck reset
+    deck.reconcile(board)
+    deck.reconcile(playerHand)
+    board += deck.draw(5-len(board))
+
+    # simulate other n number players hold cards
+    players = {'p0':playerHand}
+
+    for i in range(1,numPlayers):
+        players['p{}'.format(i)] = deck.draw(2)
+
+    # get score for all the players
+    # scores = [(p,eval.evaluate(players[p],board)) for p in list(players.keys())]
+
+    scores = {}
+    bestScore = float('inf')
+    bestPlayer = ''
+    for p in list(players.keys()):
+
+        score = evalObj.evaluate(players[p],board)
+
+        if score < bestScore:
+            bestPlayer = p
+            bestScore = score
+
+        scores[p] = score
+
+
+    if binaries:
+        return 1 if bestPlayer == 'p0' else 0
+
+    return bestPlayer,scores
+
+def formatConvertHelper(l):
+    if l != []:
+        return [deucesFormatConvert(c) for c in l]
+    return l
+
+def runSims(evalObj,n,hole,flop=[],turn=[],river=[],numPlayers=6):
+
+    # eval = Evaluator()
+
+    # reformat to deuces format
+    hole = formatConvertHelper(hole)
+    flop = formatConvertHelper(flop)
+    turn = formatConvertHelper(turn)
+    river = formatConvertHelper(river)
+
+    sims = [playGameDeuces(evalObj,hole,flop,turn,river,numPlayers,binaries=True) for n in range(0,n)]
+
+    probWin = sum(sims) / len(sims)
+
+    return probWin
+
+    
+# deck = Deck()
+# evalObj = Evaluator()
+
+# hand = ['H13','D13']
+# flop = ['S13']
+
+# tt = runSims(evalObj,1000,hand,flop)
+
+# print(tt)
+
+
+
+
+
+
 
