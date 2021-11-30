@@ -85,7 +85,7 @@ def deucesFormatConvert(s):
 
 # print('complete')
 
-def playGameDeuces(evalObj,hole,flop=[],turn=[],river=[],numPlayers=6,binaries=False):
+def playGameDeuces(evalObj,hole,board=[],numPlayers=6,binaries=False):
 
     # create deck and eval
     deck = Deck()
@@ -93,12 +93,15 @@ def playGameDeuces(evalObj,hole,flop=[],turn=[],river=[],numPlayers=6,binaries=F
 
     # deal all cards
     playerHand = hole
-    board = flop + turn + river
+    # board = flop + turn + river
     # board = [deucesFormatConvert(a) for a in board]
     # remove those that were already dealt when deck reset
     deck.reconcile(board)
     deck.reconcile(playerHand)
-    board += deck.draw(5-len(board))
+    if 5-len(board) == 1:
+        board += [deck.draw()]
+    else:
+        board += deck.draw(5-len(board))
 
     # simulate other n number players hold cards
     players = {'p0':playerHand}
@@ -133,17 +136,18 @@ def formatConvertHelper(l):
         return [deucesFormatConvert(c) for c in l]
     return l
 
-def runSims(evalObj,n,hole,flop=[],turn=[],river=[],numPlayers=6):
+def runSims(evalObj,n,hole,board=[],numPlayers=6):
 
     # eval = Evaluator()
 
     # reformat to deuces format
     hole = formatConvertHelper(hole)
-    flop = formatConvertHelper(flop)
-    turn = formatConvertHelper(turn)
-    river = formatConvertHelper(river)
+    # flop = formatConvertHelper(flop)
+    # turn = formatConvertHelper(turn)
+    # river = formatConvertHelper(river)
+    board = formatConvertHelper(board)
 
-    sims = [playGameDeuces(evalObj,hole,flop,turn,river,numPlayers,binaries=True) for n in range(0,n)]
+    sims = [playGameDeuces(evalObj,hole,board,numPlayers,binaries=True) for n in range(0,n)]
 
     probWin = sum(sims) / len(sims)
 
@@ -157,6 +161,14 @@ def runSims(evalObj,n,hole,flop=[],turn=[],river=[],numPlayers=6):
 # flop = ['S13']
 
 # tt = runSims(evalObj,1000,hand,flop)
+
+# deck = Deck()
+# evalObj = Evaluator()
+
+# hand = ['D6','D4']
+# # board = ['S13']
+
+# tt = runSims(evalObj,1000,hand)
 
 # print(tt)
 

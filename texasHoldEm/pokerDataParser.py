@@ -2,6 +2,9 @@ import pandas as pd
 import numpy as np
 import os
 
+# for prob of success models
+import deucesCode
+
 def parseGames(path):
 
     games = []
@@ -147,7 +150,28 @@ def getBlinds(game):
 
     return big, small
 
-def constructDataframe(players,game,winner,flop,turn,river,gameId):
+def getPlayersPerRound(game):
+
+    roundIxs = getRoundIndexes(game)
+
+    # get total number of players
+    uniquePlayers = list(set([s.split()[1] for s in game if 'Player' in s]))
+
+    uCounts = len(uniquePlayers)
+
+    res = []
+    res.append(uCounts)
+
+    for i in range(1,len(roundIxs)):
+        numFolded = len(list(set([s.split()[1] for (ix,s) in enumerate(game) if 
+        ix > roundIxs[i-1] and ix < roundIxs[i] and 'folds' in s])))
+
+        uCounts -= numFolded
+        res.append(uCounts)
+
+    return res[:-1] # trim last to make same len as number of rounds 
+
+def constructDataframe(players,game,winner,flop,turn,river,gameId,playerCounts):
 
     # get the indexes of the rounds in the game list, so each index is the round start, hole, flop, turn, river
     roundIxs = getRoundIndexes(game)
@@ -165,15 +189,31 @@ def constructDataframe(players,game,winner,flop,turn,river,gameId):
         bets = []
         for i in range(1,len(roundIxs)):
 
-            raw = [s for (ix,s) in enumerate(game) if player in s and '(' in s and ix > roundIxs[i-1] and ix < roundIxs[i]]
+            raw = [s for (ix,s) in enumerate(game) if player in s and '(' in s and 'Player' in s and ix > roundIxs[i-1] and ix < roundIxs[i]]
+
+            # parse uncalled bets
+            uncalled = [s for (ix,s) in enumerate(game) if player in s and '(' in s and 'Uncalled' in s and ix > roundIxs[i-1] and ix < roundIxs[i]]
 
             if raw == []:
-                bets.append(np.nan)
+                bets.append(0)
 
             else:
                 # get the integer values of all the values
                 nums = [pd.to_numeric(grabInsideParens(s)) for s in raw]
                 sumBets = sum(nums)
+
+                if player == bigBlind[0] and i == 1:
+                    sumBets += bigBlind[1]
+
+                if player == smallBlind[0] and i == 1:
+                    sumBets += smallBlind[1]
+
+                # if bet uncalled then return to player
+                if len(uncalled) != 0:
+                    nums = [pd.to_numeric(grabInsideParens(s)) for s in uncalled]
+                    sumUncalled = sum(nums)
+
+                    sumBets -= sumUncalled
 
                 bets.append(sumBets)
 
@@ -209,19 +249,80 @@ def constructDataframe(players,game,winner,flop,turn,river,gameId):
         foldBins = foldBins + [0 for a in range(0,4-len(foldBins))]
         allInBins = allInBins + [0 for a in range(0,4-len(allInBins))]
 
+        # make binary to show whether still playing , becomes 0 once folded
+        playingBin = []
+        someBin = 1
+        for ix in foldBins:
+            playingBin.append(someBin)
+            if ix == 1:
+                someBin = 0
+
+
+
+        # make a list of cards that accumulates each round, so hole then hole + flop, etc
+        cumCardsDealt = []
+        for i in range(1,len(cardsDealt[1:])+1):
+            sub = []
+            for ix in range(0,i):
+                sub += cardsDealt[1:][ix]
+
+            cumCardsDealt.append(sub)
+
+        cumCardsDealt = [cardsDealt[0]] + cumCardsDealt
+
+
+        ## things that involve calculations
+        # for every round where the player places a bet, compute a probability and a score, 
+        # the score will only be computed for rounds that have the flop dealt
+
+        # binaries based on cumulative sum of the bets adjusted by binary of whether they folder or not 
+        cumBetArr = list(np.cumsum(np.array(bets)) * np.array(playingBin))
+        someBetBins = [1 if b != 0 else 0 for b in cumBetArr]
+
+
+        # compute probability
+        evalObj = deucesCode.Evaluator()
+        handProb = []
+        for i in range(len(someBetBins)):
+            if someBetBins[i] != 0:
+                if i == 0:
+                    prob = deucesCode.runSims(evalObj,1000,players[player],board=[],numPlayers=playerCounts[i])
+
+                else:
+                    prob = deucesCode.runSims(evalObj,1000,players[player],numPlayers=playerCounts[i],board=cumCardsDealt[i])
+
+                handProb.append(prob)
+
+            else:
+                handProb.append(0)
+
+        # # compute scores
+
+        playerFormat = [deucesCode.deucesFormatConvert(c) for c in players[player]]
+        cumCardsFormat = [[deucesCode.deucesFormatConvert(sc) for sc in c] for (i,c) in enumerate(cumCardsDealt) if i > 0]
+
+        handScores = [0] + [evalObj.evaluate(playerFormat,c) for c in cumCardsFormat ]
+
+
         # convert to dataframe
 
         pdf = pd.DataFrame({
             'round':['hole','flop','turn','river'],
+            'playerCounts':playerCounts,
             'betDollar':newBets,
             'gameWinner':winBin,
             'allIn':allInBins,
             'fold':foldBins,
-            'cards':cardsDealt
+            'cards':cardsDealt,
+            'cumCards':cumCardsDealt,
+            'probWin':handProb,
+            'scores':handScores,
+            'playing':playingBin
         })
 
         pdf['bankroll'] = bankRoll
-        pdf['betPercent'] = pdf['betDollar'] / pdf['bankroll']
+        pdf['cumBet'] = pdf['betDollar'].cumsum() * pdf['playing']
+        pdf['betPercent'] = pdf['cumBet'] / pdf['bankroll']
         pdf['gameId'] = gameId
         pdf['playerName'] = player
 
@@ -261,21 +362,24 @@ def analyzeGame(game):
     # back into who the winner is
     winner = getGameWinner(game)
 
+    # get number of players at the beginning of each round
+    playerCounts = getPlayersPerRound(game)
+
     # pull bets from each player
-    output = constructDataframe(players,game,winner,flop,turn,river,gameId)
+    output = constructDataframe(players,game,winner,flop,turn,river,gameId,playerCounts)
 
     return output
 
 
 
 
-# path = os.path.join('C:\\Users','templ','Documents','GitHub','gambling','texasHoldEm','game_data','Export Holdem Manager 2.0 12302016144830.txt')
+path = os.path.join('C:\\Users','templ','Documents','GitHub','gambling','texasHoldEm','game_data','Export Holdem Manager 2.0 12302016144830.txt')
 
-# t = parseGames(path)
+t = parseGames(path)
 
-# # test = analyzeGame(t[2]) # this works fine
+# test = analyzeGame(t[2]) # this works fine
 
-# test = analyzeGame(t[9])
+test = analyzeGame(t[9])
 
 # # import time
 # # start = time.time()

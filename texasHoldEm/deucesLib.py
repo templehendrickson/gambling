@@ -273,6 +273,9 @@ class Deck (object):
         self.cards = Deck.GetFullDeck()
         shuffle(self.cards)
 
+    # def deal(self):
+    #     return self.cards.pop(0)
+
     def draw(self, n=1):
         if n == 1:
             return self.cards.pop(0)
