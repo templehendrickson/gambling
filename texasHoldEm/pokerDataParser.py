@@ -301,14 +301,16 @@ def constructDataframe(players,game,winner,flop,turn,river,gameId,playerCounts):
         playerFormat = [deucesCode.deucesFormatConvert(c) for c in players[player]]
         cumCardsFormat = [[deucesCode.deucesFormatConvert(sc) for sc in c] for (i,c) in enumerate(cumCardsDealt) if i > 0]
 
-        handScores = [0] + [evalObj.evaluate(playerFormat,c) for c in cumCardsFormat ]
+        handScores = [0] + [evalObj.evaluate(playerFormat,c) if c != [] else 0 for c in cumCardsFormat ]
 
+        # fix player counts to be same len
+        newPlayerCounts = playerCounts + [0 for _ in range(4-len(playerCounts))]
 
         # convert to dataframe
 
         pdf = pd.DataFrame({
             'round':['hole','flop','turn','river'],
-            'playerCounts':playerCounts,
+            'playerCounts':newPlayerCounts,
             'betDollar':newBets,
             'gameWinner':winBin,
             'allIn':allInBins,
@@ -379,7 +381,8 @@ t = parseGames(path)
 
 # test = analyzeGame(t[2]) # this works fine
 
-test = analyzeGame(t[9])
+test = analyzeGame(t[1])
+# test = analyzeGame(t[0])
 
 # # import time
 # # start = time.time()
@@ -387,5 +390,5 @@ test = analyzeGame(t[9])
 # # end = time.time()
 # # print("Elapsed time = %s" % (end - start))
 
-# print('complete')
+print('complete')
 
